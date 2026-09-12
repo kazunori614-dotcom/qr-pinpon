@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QRピンポン</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body{
+  font-family:-apple-system,sans-serif;
+  text-align:center;
+  background:#f5f7fb;
+  padding:20px;
+}
+h1{font-size:32px}
+#reader{
+  max-width:450px;
+  margin:20px auto;
+  background:white;
+  border-radius:15px;
+  overflow:hidden;
+}
+#result{
+  font-size:28px;
+  font-weight:bold;
+  margin:25px 0;
+}
+button{
+  width:90%;
+  max-width:350px;
+  padding:16px;
+  margin:10px;
+  border:0;
+  border-radius:15px;
+  font-size:20px;
+  background:#007aff;
+  color:white;
+}
+#again{display:none;background:#34c759}
+</style>
+</head>
+
+<body>
+
+<h1>🔔 QRピンポン</h1>
+
+<p>正解番号</p>
+<h2>12345</h2>
+
+<div id="reader"></div>
+
+<div id="result">
+QRを読み取ってね
+</div>
+
+<button id="start" onclick="startScanner()">
+📷 QRを読み取る
+</button>
+
+<button id="again" onclick="startScanner()">
+🔄 もう一度読む
+</button>
+
+<script>
+
+const CORRECT="12345";
+let scanner;
+
+function sound(ok){
+
+  const C=window.AudioContext||window.webkitAudioContext;
+  const a=new C();
+  const o=a.createOscillator();
+  const g=a.createGain();
+
+  o.connect(g);
+  g.connect(a.destination);
+
+  if(ok){
+    o.frequency.value=880;
+    g.gain.value=.3;
+  }else{
+    o.frequency.value=180;
+    g.gain.value=.2;
+  }
+
+  o.start();
+  o.stop(a.currentTime+.5);
+}
+
+function startScanner(){
+
+  document.getElementById("result").textContent=
+    "📷 QRコードを見せてね";
+
+  document.getElementById("start").style.display="none";
+  document.getElementById("again").style.display="none";
+
+  scanner=new Html5Qrcode("reader");
+
+  scanner.start(
+    {facingMode:"environment"},
+    {fps:10,qrbox:250},
+
+    function(text){
+
+      if(text.trim()===CORRECT){
+
+        document.getElementById("result").textContent=
+          "🔔 ピンポーン！🎉";
+
+        sound(true);
+
+      }else{
+
+        document.getElementById("result").textContent=
+          "❌ ブブー！";
+
+        sound(false);
+      }
+
+      scanner.stop();
+
+      document.getElementById("again").style.display="block";
+    }
+  );
+}
+
+</script>
+
+</body>
+</html>
