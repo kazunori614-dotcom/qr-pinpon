@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QRピンポン</title>
+
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
 body{
-  font-family:-apple-system,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
   text-align:center;
   background:#f5f7fb;
   padding:20px;
@@ -25,6 +26,7 @@ h1{font-size:32px}
   font-size:28px;
   font-weight:bold;
   margin:25px 0;
+  min-height:40px;
 }
 button{
   width:90%;
@@ -37,7 +39,10 @@ button{
   background:#007aff;
   color:white;
 }
-#again{display:none;background:#34c759}
+#again{
+  display:none;
+  background:#34c759;
+}
 </style>
 </head>
 
@@ -64,67 +69,203 @@ QRを読み取ってね
 
 <script>
 
-const CORRECT="12345";
-let scanner;
+const CORRECT = "12345";
 
-function sound(ok){
+let scanner = null;
+let audioContext = null;
 
-  const C=window.AudioContext||window.webkitAudioContext;
-  const a=new C();
-  const o=a.createOscillator();
-  const g=a.createGain();
 
-  o.connect(g);
-  g.connect(a.destination);
+// ======================================
+// 音声を準備
+// 「QRを読み取る」ボタンを押した瞬間に実行
+// ======================================
 
-  if(ok){
-    o.frequency.value=880;
-    g.gain.value=.3;
-  }else{
-    o.frequency.value=180;
-    g.gain.value=.2;
+function prepareAudio(){
+
+  const AudioContext =
+    window.AudioContext ||
+    window.webkitAudioContext;
+
+  if(!audioContext){
+    audioContext = new AudioContext();
   }
 
-  o.start();
-  o.stop(a.currentTime+.5);
+  if(audioContext.state === "suspended"){
+    audioContext.resume();
+  }
 }
 
-function startScanner(){
 
-  document.getElementById("result").textContent=
+// ======================================
+// ピンポーン音
+// ======================================
+
+function playCorrectSound(){
+
+  prepareAudio();
+
+  const now = audioContext.currentTime;
+
+
+  // ピン♪
+
+  const o1 = audioContext.createOscillator();
+  const g1 = audioContext.createGain();
+
+  o1.type = "sine";
+  o1.frequency.value = 880;
+
+  g1.gain.setValueAtTime(0.35, now);
+  g1.gain.exponentialRampToValueAtTime(
+    0.001,
+    now + 0.35
+  );
+
+  o1.connect(g1);
+  g1.connect(audioContext.destination);
+
+  o1.start(now);
+  o1.stop(now + 0.35);
+
+
+  // ポーン♪
+
+  const o2 = audioContext.createOscillator();
+  const g2 = audioContext.createGain();
+
+  o2.type = "sine";
+  o2.frequency.value = 660;
+
+  g2.gain.setValueAtTime(0.35, now + 0.3);
+  g2.gain.exponentialRampToValueAtTime(
+    0.001,
+    now + 0.9
+  );
+
+  o2.connect(g2);
+  g2.connect(audioContext.destination);
+
+  o2.start(now + 0.3);
+  o2.stop(now + 0.9);
+}
+
+
+// ======================================
+// ブブー音
+// ======================================
+
+function playWrongSound(){
+
+  prepareAudio();
+
+  const now = audioContext.currentTime;
+
+  const o = audioContext.createOscillator();
+  const g = audioContext.createGain();
+
+  o.type = "square";
+  o.frequency.value = 180;
+
+  g.gain.setValueAtTime(0.25, now);
+  g.gain.exponentialRampToValueAtTime(
+    0.001,
+    now + 0.5
+  );
+
+  o.connect(g);
+  g.connect(audioContext.destination);
+
+  o.start(now);
+  o.stop(now + 0.5);
+}
+
+
+// ======================================
+// QR読み取り開始
+// ======================================
+
+async function startScanner(){
+
+  // ★ここで音声を準備する
+  prepareAudio();
+
+  document.getElementById("result").textContent =
     "📷 QRコードを見せてね";
 
-  document.getElementById("start").style.display="none";
-  document.getElementById("again").style.display="none";
+  document.getElementById("start").style.display =
+    "none";
 
-  scanner=new Html5Qrcode("reader");
+  document.getElementById("again").style.display =
+    "none";
 
-  scanner.start(
-    {facingMode:"environment"},
-    {fps:10,qrbox:250},
 
-    function(text){
+  if(scanner){
 
-      if(text.trim()===CORRECT){
+    try{
+      await scanner.clear();
+    }catch(e){}
 
-        document.getElementById("result").textContent=
-          "🔔 ピンポーン！🎉";
+  }
 
-        sound(true);
 
-      }else{
+  scanner = new Html5Qrcode("reader");
 
-        document.getElementById("result").textContent=
-          "❌ ブブー！";
 
-        sound(false);
+  try{
+
+    await scanner.start(
+
+      {facingMode:"environment"},
+
+      {
+        fps:10,
+        qrbox:250
+      },
+
+      async function(decodedText){
+
+        const number = decodedText.trim();
+
+
+        if(number === CORRECT){
+
+          document.getElementById("result").textContent =
+            "🔔 ピンポーン！🎉";
+
+          playCorrectSound();
+
+        }else{
+
+          document.getElementById("result").textContent =
+            "❌ ブブー！";
+
+          playWrongSound();
+
+        }
+
+
+        try{
+          await scanner.stop();
+        }catch(e){}
+
+
+        document.getElementById("again").style.display =
+          "block";
+
       }
 
-      scanner.stop();
+    );
 
-      document.getElementById("again").style.display="block";
-    }
-  );
+  }catch(error){
+
+    document.getElementById("result").textContent =
+      "⚠️ カメラを起動できませんでした";
+
+    document.getElementById("start").style.display =
+      "block";
+
+    console.log(error);
+  }
 }
 
 </script>
